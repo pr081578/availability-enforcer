@@ -1,0 +1,42 @@
+---
+# tasks file for sample-role
+- name: check if hosts is set not set to all
+  fail:
+    msg: "Playbook is running for all hosts. Please use option --limit {{ ansible_ssh_host }} or designated play for {{ ansible_ssh_host }}.yml"
+  when: ansible_play_batch | length > 1 and group_var.multiple_host == false
+
+- name: submitting availability zone selection
+  assert: 
+    that:
+      - "'{{ raw_input_az }}' == '{{ item }}'"
+  with_items: '{{ group_var.availiability_zone_names }}'
+  ignore_errors: yes 
+  register: submit_az
+  when: raw_input_az is defined
+
+- name: validation availability zone selection
+  set_fact:
+    availability_zone: '{{ item.item }}'
+  with_items: '{{ submit_az.results }}' 
+  when: item.failed == false
+
+- name: failing playbook if availability zone is undefined
+  fail:
+    msg: '({{ raw_input_az }}) could not be match as a valid availability zone. Please rerun playbook and select the following availability zones [ az1, az2, az3 ]'
+  when: availability_zone is undefined
+
+- name: setting fact for host_vars
+  set_fact:
+    host_vars: '{{ item }}'
+  with_dict: '{{ node.availiability_zones }}'
+  when: item.key == '{{ availability_zone }}'
+
+- name: setting facts for group_var
+  set_fact:
+    group_vars: '{{ item }}'
+  with_dict: '{{ group_var.availiability_zones }}'
+  when: item.key == '{{ availability_zone }}'
+
+- name: setting facts for group_vault
+  debug:
+    var: group_vault
